@@ -18,7 +18,7 @@ limitations under the License.
     android:id="@+id/pageView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/black"
+    android:background="@android:color/black"
     android:fitsSystemWindows="true">
 
     <ImageView
@@ -43,10 +43,10 @@ limitations under the License.
             android:ellipsize="end"
             android:gravity="center_horizontal"
             android:maxLines="1"
-            android:shadowColor="@color/black"
+            android:shadowColor="@android:color/black"
             android:shadowRadius="20"
             android:textAppearance="?android:attr/textAppearanceLarge"
-            android:textColor="#E5FFFFFF" />
+            android:textColor="@color/fullscreen_line_color" />
 
         <TextView
             android:id="@+id/line2"
@@ -58,9 +58,9 @@ limitations under the License.
             android:gravity="center_horizontal"
             android:maxLines="1"
             android:textAppearance="?android:attr/textAppearanceMedium"
-            android:shadowColor="@color/black"
+            android:shadowColor="@android:color/black"
             android:shadowRadius="20"
-            android:textColor="#E5CCCCCC" />
+            android:textColor="@color/fullscreen_secondary_line_color" />
 
         <TextView
             android:id="@+id/line3"
@@ -72,9 +72,9 @@ limitations under the License.
             android:gravity="center_horizontal"
             android:maxLines="1"
             android:textAppearance="?android:attr/textAppearanceMedium"
-            android:shadowColor="@color/black"
+            android:shadowColor="@android:color/black"
             android:shadowRadius="20"
-            android:textColor="#E5CCCCCC" />
+            android:textColor="@color/fullscreen_secondary_line_color" />
 
         <LinearLayout
             android:id="@+id/controllers"
@@ -96,7 +96,7 @@ limitations under the License.
                     android:layout_alignParentStart="true"
                     android:gravity="center_vertical"
                     android:maxLines="1"
-                    android:textColor="@color/white" />
+                    android:textColor="@android:color/white" />
 
                 <SeekBar
                     android:id="@+id/seekBar1"
@@ -118,7 +118,7 @@ limitations under the License.
                     android:gravity="center_vertical"
                     android:layout_alignWithParentIfMissing="true"
                     android:maxLines="1"
-                    android:textColor="@color/white" />
+                    android:textColor="@android:color/white" />
 
             </RelativeLayout>
 
@@ -131,17 +131,17 @@ limitations under the License.
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:background="?android:selectableItemBackgroundBorderless"
+                    android:background="?selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_skip_previous_white_48dp"
                     android:contentDescription="@string/skip_prev"/>
 
                 <ImageView
-                    android:id="@+id/imageView1"
+                    android:id="@+id/play_pause"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="2"
-                    android:background="?android:selectableItemBackgroundBorderless"
-                    android:src="@drawable/ic_play_arrow_white_48dp"
+                    android:background="?selectableItemBackgroundBorderless"
+                    android:src="@drawable/uamp_ic_play_arrow_white_48dp"
                     android:contentDescription="@string/play_pause"/>
 
                 <ImageView
@@ -149,7 +149,7 @@ limitations under the License.
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:background="?android:selectableItemBackgroundBorderless"
+                    android:background="?selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_skip_next_white_48dp"
                     android:contentDescription="@string/skip_next"/>
 
@@ -173,7 +173,7 @@ limitations under the License.
         android:layout_height="?attr/actionBarSize"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
-        android:background="@drawable/actionbar_bg_gradient_light"
+        android:background="@drawable/fullscreen_toolbar_bg_gradient"
         android:popupTheme="@style/ThemeOverlay.AppCompat.Light"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"/>
 

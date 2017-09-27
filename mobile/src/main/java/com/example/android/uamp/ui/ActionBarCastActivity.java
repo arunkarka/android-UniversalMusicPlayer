@@ -21,30 +21,27 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.annotation.NonNull;
+import android.support.design.widget.NavigationView;
+import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
-import android.support.v7.app.ActionBarActivity;
 import android.support.v7.app.ActionBarDrawerToggle;
+import android.support.v7.app.AppCompatActivity;
 import android.support.v7.app.MediaRouteButton;
-import android.support.v7.media.MediaRouter;
 import android.support.v7.widget.Toolbar;
-import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ListView;
-import android.widget.SimpleAdapter;
 
 import com.example.android.uamp.R;
-import com.example.android.uamp.UAMPApplication;
 import com.example.android.uamp.utils.LogHelper;
-import com.example.android.uamp.utils.PrefUtils;
-import com.example.android.uamp.utils.ResourceHelper;
-import com.github.amlcurran.showcaseview.ShowcaseView;
-import com.github.amlcurran.showcaseview.targets.ViewTarget;
-import com.google.sample.castcompanionlibrary.cast.VideoCastManager;
-import com.google.sample.castcompanionlibrary.cast.callbacks.VideoCastConsumerImpl;
+import com.google.android.gms.cast.framework.CastButtonFactory;
+import com.google.android.gms.cast.framework.CastContext;
+import com.google.android.gms.cast.framework.CastState;
+import com.google.android.gms.cast.framework.CastStateListener;
+import com.google.android.gms.cast.framework.IntroductoryOverlay;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
 
 /**
  * Abstract activity with toolbar, navigation drawer and cast support. Needs to be extended by
@@ -56,55 +53,31 @@ import com.google.sample.castcompanionlibrary.cast.callbacks.VideoCastConsumerIm
  * a {@link android.support.v4.widget.DrawerLayout} with id 'drawerLayout' and
  * a {@link android.widget.ListView} with id 'drawerList'.
  */
-public abstract class ActionBarCastActivity extends ActionBarActivity {
+public abstract class ActionBarCastActivity extends AppCompatActivity {
 
     private static final String TAG = LogHelper.makeLogTag(ActionBarCastActivity.class);
 
     private static final int DELAY_MILLIS = 1000;
 
-    private VideoCastManager mCastManager;
+    private CastContext mCastContext;
     private MenuItem mMediaRouteMenuItem;
     private Toolbar mToolbar;
     private ActionBarDrawerToggle mDrawerToggle;
     private DrawerLayout mDrawerLayout;
-    private ListView mDrawerList;
-    private DrawerMenuContents mDrawerMenuContents;
 
     private boolean mToolbarInitialized;
 
     private int mItemToOpenWhenDrawerCloses = -1;
 
-    private VideoCastConsumerImpl mCastConsumer = new VideoCastConsumerImpl() {
-
+    private CastStateListener mCastStateListener = new CastStateListener() {
         @Override
-        public void onFailed(int resourceId, int statusCode) {
-            LogHelper.d(TAG, "onFailed ", resourceId, " status ", statusCode);
-        }
-
-        @Override
-        public void onConnectionSuspended(int cause) {
-            LogHelper.d(TAG, "onConnectionSuspended() was called with cause: ", cause);
-        }
-
-        @Override
-        public void onConnectivityRecovered() {
-        }
-
-        @Override
-        public void onCastDeviceDetected(final MediaRouter.RouteInfo info) {
-            // FTU stands for First Time Use:
-            if (!PrefUtils.isFtuShown(ActionBarCastActivity.this)) {
-                // If user is seeing the cast button for the first time, we will
-                // show an overlay that explains what that button means.
-                PrefUtils.setFtuShown(ActionBarCastActivity.this, true);
-
-                LogHelper.d(TAG, "Route is visible: ", info);
+        public void onCastStateChanged(int newState) {
+            if (newState != CastState.NO_DEVICES_AVAILABLE) {
                 new Handler().postDelayed(new Runnable() {
-
                     @Override
                     public void run() {
                         if (mMediaRouteMenuItem.isVisible()) {
-                            LogHelper.d(TAG, "Cast Icon is visible: ", info.getName());
+                            LogHelper.d(TAG, "Cast Icon is visible");
                             showFtu();
                         }
                     }
@@ -113,17 +86,27 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
         }
     };
 
-    private DrawerLayout.DrawerListener mDrawerListener = new DrawerLayout.DrawerListener() {
+    private final DrawerLayout.DrawerListener mDrawerListener = new DrawerLayout.DrawerListener() {
         @Override
         public void onDrawerClosed(View drawerView) {
             if (mDrawerToggle != null) mDrawerToggle.onDrawerClosed(drawerView);
-            int position = mItemToOpenWhenDrawerCloses;
-            if (position >= 0) {
+            if (mItemToOpenWhenDrawerCloses >= 0) {
                 Bundle extras = ActivityOptions.makeCustomAnimation(
                     ActionBarCastActivity.this, R.anim.fade_in, R.anim.fade_out).toBundle();
 
-                Class activityClass = mDrawerMenuContents.getActivity(position);
-                startActivity(new Intent(ActionBarCastActivity.this, activityClass), extras);
+                Class activityClass = null;
+                switch (mItemToOpenWhenDrawerCloses) {
+                    case R.id.navigation_allmusic:
+                        activityClass = MusicPlayerActivity.class;
+                        break;
+                    case R.id.navigation_playlists:
+                        activityClass = PlaceholderActivity.class;
+                        break;
+                }
+                if (activityClass != null) {
+                    startActivity(new Intent(ActionBarCastActivity.this, activityClass), extras);
+                    finish();
+                }
             }
         }
 
@@ -140,11 +123,12 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
         @Override
         public void onDrawerOpened(View drawerView) {
             if (mDrawerToggle != null) mDrawerToggle.onDrawerOpened(drawerView);
-            getSupportActionBar().setTitle(R.string.app_name);
+            if (getSupportActionBar() != null) getSupportActionBar()
+                    .setTitle(R.string.app_name);
         }
     };
 
-    private FragmentManager.OnBackStackChangedListener mBackStackChangedListener =
+    private final FragmentManager.OnBackStackChangedListener mBackStackChangedListener =
         new FragmentManager.OnBackStackChangedListener() {
             @Override
             public void onBackStackChanged() {
@@ -157,11 +141,12 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
         super.onCreate(savedInstanceState);
         LogHelper.d(TAG, "Activity onCreate");
 
-        // Ensure that Google Play Service is available.
-        VideoCastManager.checkGooglePlayServices(this);
+        int playServicesAvailable =
+                GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
 
-        mCastManager = ((UAMPApplication) getApplication()).getCastManager(this);
-        mCastManager.reconnectSessionIfPossible();
+        if (playServicesAvailable == ConnectionResult.SUCCESS) {
+            mCastContext = CastContext.getSharedInstance(this);
+        }
     }
 
     @Override
@@ -184,8 +169,10 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
     @Override
     public void onResume() {
         super.onResume();
-        mCastManager.addVideoCastConsumer(mCastConsumer);
-        mCastManager.incrementUiCounter();
+
+        if (mCastContext != null) {
+            mCastContext.addCastStateListener(mCastStateListener);
+        }
 
         // Whenever the fragment back stack changes, we may need to update the
         // action bar toggle: only top level screens show the hamburger-like icon, inner
@@ -204,8 +191,10 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
     @Override
     public void onPause() {
         super.onPause();
-        mCastManager.removeVideoCastConsumer(mCastConsumer);
-        mCastManager.decrementUiCounter();
+
+        if (mCastContext != null) {
+            mCastContext.removeCastStateListener(mCastStateListener);
+        }
         getFragmentManager().removeOnBackStackChangedListener(mBackStackChangedListener);
     }
 
@@ -213,7 +202,11 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         super.onCreateOptionsMenu(menu);
         getMenuInflater().inflate(R.menu.main, menu);
-        mMediaRouteMenuItem = mCastManager.addMediaRouterButton(menu, R.id.media_route_menu_item);
+
+        if (mCastContext != null) {
+            mMediaRouteMenuItem = CastButtonFactory.setUpMediaRouteButton(getApplicationContext(),
+                    menu, R.id.media_route_menu_item);
+        }
         return true;
     }
 
@@ -233,7 +226,7 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
     @Override
     public void onBackPressed() {
         // If the drawer is open, back will close it
-        if (mDrawerLayout != null && mDrawerLayout.isDrawerOpen(Gravity.START)) {
+        if (mDrawerLayout != null && mDrawerLayout.isDrawerOpen(GravityCompat.START)) {
             mDrawerLayout.closeDrawers();
             return;
         }
@@ -267,21 +260,19 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
         }
         mToolbar.inflateMenu(R.menu.main);
 
-        mDrawerLayout = (DrawerLayout) findViewById(R.id.drawerLayout);
+        mDrawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
         if (mDrawerLayout != null) {
-            mDrawerList = (ListView) findViewById(R.id.drawer_list);
-            if (mDrawerList == null) {
-                throw new IllegalStateException("A layout with a drawerLayout is required to" +
-                    "include a ListView with id 'drawerList'");
+            NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
+            if (navigationView == null) {
+                throw new IllegalStateException("Layout requires a NavigationView " +
+                        "with id 'nav_view'");
             }
 
             // Create an ActionBarDrawerToggle that will handle opening/closing of the drawer:
             mDrawerToggle = new ActionBarDrawerToggle(this, mDrawerLayout,
                 mToolbar, R.string.open_content_drawer, R.string.close_content_drawer);
             mDrawerLayout.setDrawerListener(mDrawerListener);
-            mDrawerLayout.setStatusBarBackgroundColor(
-                ResourceHelper.getThemeColor(this, R.attr.colorPrimary, android.R.color.black));
-            populateDrawerItems();
+            populateDrawerItems(navigationView);
             setSupportActionBar(mToolbar);
             updateDrawerToggle();
         } else {
@@ -291,39 +282,22 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
         mToolbarInitialized = true;
     }
 
-    private void populateDrawerItems() {
-        mDrawerMenuContents = new DrawerMenuContents(this);
-        final int selectedPosition = mDrawerMenuContents.getPosition(this.getClass());
-        final int unselectedColor = getResources().getColor(R.color.white);
-        final int selectedColor = getResources().getColor(R.color.drawer_item_selected_background);
-        SimpleAdapter adapter = new SimpleAdapter(this, mDrawerMenuContents.getItems(),
-                R.layout.drawer_list_item,
-                new String[]{DrawerMenuContents.FIELD_TITLE, DrawerMenuContents.FIELD_ICON},
-                new int[]{R.id.drawer_item_title, R.id.drawer_item_icon}) {
-            @Override
-            public View getView(int position, View convertView, ViewGroup parent) {
-                View view = super.getView(position, convertView, parent);
-                int color = unselectedColor;
-                if (position == selectedPosition) {
-                    color = selectedColor;
-                }
-                view.setBackgroundColor(color);
-                return view;
-            }
-        };
-
-        mDrawerList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-           @Override
-           public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-               if (position != selectedPosition) {
-                   view.setBackgroundColor(getResources().getColor(
-                       R.color.drawer_item_selected_background));
-                   mItemToOpenWhenDrawerCloses = position;
-               }
-               mDrawerLayout.closeDrawers();
-           }
-        });
-        mDrawerList.setAdapter(adapter);
+    private void populateDrawerItems(NavigationView navigationView) {
+        navigationView.setNavigationItemSelectedListener(
+                new NavigationView.OnNavigationItemSelectedListener() {
+                    @Override
+                    public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
+                        menuItem.setChecked(true);
+                        mItemToOpenWhenDrawerCloses = menuItem.getItemId();
+                        mDrawerLayout.closeDrawers();
+                        return true;
+                    }
+                });
+        if (MusicPlayerActivity.class.isAssignableFrom(getClass())) {
+            navigationView.setCheckedItem(R.id.navigation_allmusic);
+        } else if (PlaceholderActivity.class.isAssignableFrom(getClass())) {
+            navigationView.setCheckedItem(R.id.navigation_playlists);
+        }
     }
 
     protected void updateDrawerToggle() {
@@ -332,9 +306,11 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
         }
         boolean isRoot = getFragmentManager().getBackStackEntryCount() == 0;
         mDrawerToggle.setDrawerIndicatorEnabled(isRoot);
-        getSupportActionBar().setDisplayShowHomeEnabled(!isRoot);
-        getSupportActionBar().setDisplayHomeAsUpEnabled(!isRoot);
-        getSupportActionBar().setHomeButtonEnabled(!isRoot);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayShowHomeEnabled(!isRoot);
+            getSupportActionBar().setDisplayHomeAsUpEnabled(!isRoot);
+            getSupportActionBar().setHomeButtonEnabled(!isRoot);
+        }
         if (isRoot) {
             mDrawerToggle.syncState();
         }
@@ -348,11 +324,11 @@ public abstract class ActionBarCastActivity extends ActionBarActivity {
         Menu menu = mToolbar.getMenu();
         View view = menu.findItem(R.id.media_route_menu_item).getActionView();
         if (view != null && view instanceof MediaRouteButton) {
-            new ShowcaseView.Builder(this)
-                    .setTarget(new ViewTarget(view))
-                    .setContentTitle(R.string.touch_to_cast)
-                    .hideOnTouchOutside()
+            IntroductoryOverlay overlay = new IntroductoryOverlay.Builder(this, mMediaRouteMenuItem)
+                    .setTitleText(R.string.touch_to_cast)
+                    .setSingleTime()
                     .build();
+            overlay.show();
         }
     }
 }

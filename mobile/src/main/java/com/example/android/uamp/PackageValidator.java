@@ -37,6 +37,11 @@ import java.util.Map;
  *
  * The list of allowed signing certificates and their corresponding package names is defined in
  * res/xml/allowed_media_browser_callers.xml.
+ *
+ * If you add a new valid caller to allowed_media_browser_callers.xml and you don't know
+ * its signature, this class will print to logcat (INFO level) a message with the proper base64
+ * version of the caller certificate that has not been validated. You can copy from logcat and
+ * paste into allowed_media_browser_callers.xml. Spaces and newlines are ignored.
  */
 public class PackageValidator {
     private static final String TAG = LogHelper.makeLogTag(PackageValidator.class);
@@ -65,7 +70,7 @@ public class PackageValidator {
                     boolean isRelease = parser.getAttributeBooleanValue(null, "release", false);
                     String certificate = parser.nextText().replaceAll("\\s|\\n", "");
 
-                    CallerInfo info = new CallerInfo(name, packageName, isRelease, certificate);
+                    CallerInfo info = new CallerInfo(name, packageName, isRelease);
 
                     ArrayList<CallerInfo> infos = validCertificates.get(certificate);
                     if (infos == null) {
@@ -94,17 +99,17 @@ public class PackageValidator {
         if (Process.SYSTEM_UID == callingUid || Process.myUid() == callingUid) {
             return true;
         }
-        PackageManager packageManager = context.getPackageManager();
-        PackageInfo packageInfo;
-        try {
-            packageInfo = packageManager.getPackageInfo(
-                    callingPackage, PackageManager.GET_SIGNATURES);
-        } catch (PackageManager.NameNotFoundException e) {
-            LogHelper.w(TAG, e, "Package manager can't find package: ", callingPackage);
+
+        if (isPlatformSigned(context, callingPackage)) {
+            return true;
+        }
+
+        PackageInfo packageInfo = getPackageInfo(context, callingPackage);
+        if (packageInfo == null) {
             return false;
         }
         if (packageInfo.signatures.length != 1) {
-            LogHelper.w(TAG, "Caller has more than one signature certificate!");
+            LogHelper.w(TAG, "Caller does not have exactly one signature certificate!");
             return false;
         }
         String signature = Base64.encodeToString(
@@ -142,18 +147,47 @@ public class PackageValidator {
         return false;
     }
 
+    /**
+     * @return true if the installed package signature matches the platform signature.
+     */
+    private boolean isPlatformSigned(Context context, String pkgName) {
+        PackageInfo platformPackageInfo = getPackageInfo(context, "android");
+
+        // Should never happen.
+        if (platformPackageInfo == null || platformPackageInfo.signatures == null
+                || platformPackageInfo.signatures.length == 0) {
+            return false;
+        }
+
+        PackageInfo clientPackageInfo = getPackageInfo(context, pkgName);
+
+        return (clientPackageInfo != null && clientPackageInfo.signatures != null
+                && clientPackageInfo.signatures.length > 0 &&
+                platformPackageInfo.signatures[0].equals(clientPackageInfo.signatures[0]));
+    }
+
+    /**
+     * @return {@link PackageInfo} for the package name or null if it's not found.
+     */
+    private PackageInfo getPackageInfo(Context context, String pkgName) {
+        try {
+            final PackageManager pm = context.getPackageManager();
+            return pm.getPackageInfo(pkgName, PackageManager.GET_SIGNATURES);
+        } catch (PackageManager.NameNotFoundException e) {
+            LogHelper.w(TAG, e, "Package manager can't find package: ", pkgName);
+        }
+        return null;
+    }
+
     private final static class CallerInfo {
         final String name;
         final String packageName;
         final boolean release;
-        final String signingCertificate;
 
-        public CallerInfo(String name, String packageName, boolean release,
-                          String signingCertificate) {
+        public CallerInfo(String name, String packageName, boolean release) {
             this.name = name;
             this.packageName = packageName;
             this.release = release;
-            this.signingCertificate = signingCertificate;
         }
     }
 }
